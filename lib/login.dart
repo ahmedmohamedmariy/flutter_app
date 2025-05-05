@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'Home_pages/homepage.dart';
 import 'SignUp.dart';
 import 'forgetpassword.dart';
+import 'controllers/userController.dart'; // Import UserController
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({Key? key}) : super(key: key);
 
   @override
   _LoginPageState createState() => _LoginPageState();
@@ -20,60 +19,6 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
   bool _isLoading = false;
-  String? _userName;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkLoginStatus();
-    _fetchUserName();
-  }
-
-  Future<void> _checkLoginStatus() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-    if (isLoggedIn) {
-      String name = prefs.getString('name') ?? 'User';
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => HomePage(userName: name)),
-      );
-    }
-  }
-
-  Future<void> _fetchUserName() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _userName = prefs.getString('name') ?? 'User';
-    });
-  }
-
-  Future<User?> signInWithGoogle() async {
-    try {
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return null;
-
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-      final AuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final UserCredential userCredential =
-          await FirebaseAuth.instance.signInWithCredential(credential);
-
-      // حفظ الحالة في SharedPreferences
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isLoggedIn', true);
-      await prefs.setString('name', userCredential.user?.displayName ?? 'User');
-
-      return userCredential.user;
-    } catch (e) {
-      print("Error signing in with Google: $e");
-      return null;
-    }
-  }
 
   void _handleLogin() async {
     if (_formKey.currentState!.validate()) {
@@ -81,30 +26,35 @@ class _LoginPageState extends State<LoginPage> {
         _isLoading = true;
       });
 
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-
-      String? savedEmail = prefs.getString('currentUserEmail');
-      String? savedPassword = prefs.getString('currentUserPassword');
       String email = _emailController.text.trim();
       String password = _passwordController.text.trim();
 
-      if (savedPassword == null ||
-          savedEmail != email ||
-          savedPassword != password) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Incorrect email or password!')),
-        );
-      } else {
+      // Instantiate UserController
+      UserController userController = UserController();
+
+      // Call the login method
+      final response = await userController.login(
+        email: email,
+        password: password,
+      );
+
+      if (response['success']) {
+        // Save token and user data
+        final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isLoggedIn', true); // حفظ حالة الدخول
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login Successful!')),
+          SnackBar(content: Text(response['message'])),
         );
 
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-              builder: (context) => HomePage(userName: _userName ?? 'User')),
+              builder: (context) => HomePage(userName: response['data']['user']['name'] ?? 'User')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response['message'])),
         );
       }
 
@@ -194,7 +144,7 @@ class _LoginPageState extends State<LoginPage> {
                           context,
                           MaterialPageRoute(
                               builder: (context) =>
-                                  const ForgetPasswordPage()),
+                                  ForgetPasswordPage()),
                         );
                       },
                       child: const Text(
@@ -266,64 +216,6 @@ class _LoginPageState extends State<LoginPage> {
                           ],
                         ),
                   const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () async {
-                      User? user = await signInWithGoogle();
-                      if (user != null) {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => HomePage(
-                                userName: user.displayName ?? 'John Doe'),
-                          ),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 14, horizontal: 20),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(50),
-                        side: const BorderSide(color: Colors.blueAccent),
-                      ),
-                      elevation: 8,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.5),
-                                spreadRadius: 2,
-                                blurRadius: 5,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Image.asset(
-                            'images/google_logo.png',
-                            height: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 15),
-                        const Text(
-                          'Sign in with Google',
-                          style: TextStyle(
-                            color: Colors.black87,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                   const SizedBox(height: 20),
                 ],
               ),

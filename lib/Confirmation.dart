@@ -1,36 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'changepassword.dart'as change; // تم تغيير الاستيراد للصفحة الجديدة الخاصة بتغيير الباسورد بدون الحاجة للباسورد القديم
+import 'changepassword.dart' as change;
+import 'controllers/userController.dart';
+import 'Home_pages/HomePage.dart';
 
 class ConfirmationCodePage extends StatefulWidget {
-  final String expectedCode;
-
-  const ConfirmationCodePage({super.key, required this.expectedCode});
+  final String email;
+  const ConfirmationCodePage({Key? key, required this.email}) : super(key: key);
 
   @override
-  _ConfirmationCodePageState createState() => _ConfirmationCodePageState();
+  State<ConfirmationCodePage> createState() => _ConfirmationCodePageState();
 }
 
 class _ConfirmationCodePageState extends State<ConfirmationCodePage> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _codeController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
 
-  void _handleConfirmCode() {
+  void _handleConfirmCode() async {
     if (_formKey.currentState!.validate()) {
-      if (_codeController.text.trim() == widget.expectedCode) {
+      String code = _codeController.text.trim();
+      String password = _passwordController.text.trim();
+      String confirmPassword = _confirmPasswordController.text.trim();
+
+      String email = widget.email;
+
+      UserController userController = UserController();
+
+      final response = await userController.resetPassword(
+        email: email,
+        code: code,
+        newPassword: password,
+        confirmNewPassword: confirmPassword,
+      );
+
+      if (response['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Code verified successfully!')),
+          SnackBar(content: Text(response['message'])),
         );
 
-        // الانتقال إلى صفحة تغيير كلمة المرور بدون الحاجة للباسورد القديم
         Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) =>  const change.ChangePasswordPage(email: '')),
-        );
+            context,
+            MaterialPageRoute(
+                builder: (context) => HomePage(userName: response['data'] != null && response['data']['user'] != null ? response['data']['user']['name'] : 'User')));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Incorrect confirmation code!')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(response['message'])));
       }
     }
   }
@@ -98,6 +114,55 @@ class _ConfirmationCodePageState extends State<ConfirmationCodePage> {
                         return 'Confirmation code cannot be empty';
                       } else if (value.length != 6) {
                         return 'Code must be 6 digits';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 15),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.lock, color: Colors.white),
+                      hintText: 'Password',
+                      hintStyle: const TextStyle(color: Colors.white70),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.1),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your password';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 15),
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.lock, color: Colors.white),
+                      hintText: 'Confirm Password',
+                      hintStyle: const TextStyle(color: Colors.white70),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.1),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please confirm your password';
+                      }
+                      if (value != _passwordController.text) {
+                        return 'Passwords do not match';
                       }
                       return null;
                     },

@@ -1,7 +1,9 @@
+import 'controllers/userController.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'Login.dart';
+import '../Home_pages/HomePage.dart'; // Import HomePage
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -21,51 +23,38 @@ class _SignUpPageState extends State<SignUpPage> {
       TextEditingController();
   bool _isPasswordVisible = false;
 
-  Future<void> _saveUserData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-
-    // جلب القوائم الحالية أو إنشاء قوائم جديدة
-    List<String> emails = prefs.getStringList('emails') ?? [];
-    List<String> passwords = prefs.getStringList('passwords') ?? [];
-    List<String> names = prefs.getStringList('names') ?? [];
-    List<String> emergencyNumbers =
-        prefs.getStringList('emergencyNumbers') ?? [];
-
-    // إضافة بيانات المستخدم الجديد
-    emails.add(_emailController.text.trim());
-    passwords.add(_passwordController.text.trim());
-    names.add(_nameController.text.trim());
-    emergencyNumbers.add(_emergencyNumberController.text.trim());
-
-    // حفظ القوائم المحدثة
-    await prefs.setStringList('emails', emails);
-    await prefs.setStringList('passwords', passwords);
-    await prefs.setStringList('names', names);
-    await prefs.setStringList('emergencyNumbers', emergencyNumbers);
-
-    // حفظ بيانات المستخدم الحالي
-    await prefs.setString('currentUserName', _nameController.text.trim());
-    await prefs.setString('currentUserEmail', _emailController.text.trim());
-    await prefs.setString(
-        'currentEmergencyNumber', _emergencyNumberController.text.trim());
-    await prefs.setString('currentUserPassword',
-        _passwordController.text.trim()); // حفظ كلمة المرور الحالية
-  }
-
   void _handleSignUp() async {
     if (_formKey.currentState!.validate()) {
       if (_passwordController.text != _confirmPasswordController.text) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Passwords do not match!')),
         );
-      } else {
-        await _saveUserData();
+        return;
+      }
+
+      // Instantiate UserController
+      UserController userController = UserController();
+
+      // Call the register method
+      final response = await userController.register(
+        name: _nameController.text,
+        email: _emailController.text,
+        password: _passwordController.text,
+        confirmPassword: _confirmPasswordController.text,
+        emergencyPhone: _emergencyNumberController.text,
+      );
+
+      if (response['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sign Up Successful!')),
+          SnackBar(content: Text(response['message'])),
         );
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
+          MaterialPageRoute(builder: (context) => HomePage(userName: _nameController.text)), // Navigate to HomePage
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response['message'])),
         );
       }
     }

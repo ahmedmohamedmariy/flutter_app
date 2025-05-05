@@ -1,45 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'changepassword.dart' as changepassword;
-import 'confirmation.dart'; // تأكد من استيراد الصفحة التانية
+import 'confirmation.dart'; // Import ConfirmationCodePage
+import 'controllers/userController.dart'; // Import UserController
 
 class ForgetPasswordPage extends StatefulWidget {
-  const ForgetPasswordPage({super.key});
+  ForgetPasswordPage({Key? key}) : super(key: key);
 
   @override
-  _ForgetPasswordPageState createState() => _ForgetPasswordPageState();
+  State<ForgetPasswordPage> createState() => _ForgetPasswordPageState();
 }
 
 class _ForgetPasswordPageState extends State<ForgetPasswordPage> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
 
-  // دالة غير متزامنة لمعالجة عملية إعادة تعيين كلمة المرور
-  Future<void> _handleResetPassword() async {
+  void _handleResetPassword() async {
     if (_formKey.currentState!.validate()) {
-      // محاكاة عملية إرسال الكود على البريد الإلكتروني
-      const mockCode = "123456";
+      String email = _emailController.text.trim();
 
-      // حفظ البريد في SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('reset_email', _emailController.text);
+      // Instantiate UserController
+      UserController userController = UserController();
 
-      // محاكاة تأخير عند إرسال الكود (مثل الاتصال بالخادم)
-      await Future.delayed(const Duration(seconds: 2));
-
-      // عرض رسالة للمستخدم
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Confirmation code sent to your email!')),
+      // Call the forgotPassword method
+      final response = await userController.forgotPassword(
+        email: email,
       );
 
-      // الانتقال مباشرة لصفحة تأكيد الكود
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const ConfirmationCodePage(expectedCode: mockCode),
-        ),
-      );
+      if (response['success']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response['message'])),
+        );
+
+        // Navigate to ConfirmationCodePage and pass the email
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (context) => ConfirmationCodePage(key: Key(email), email: email)),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response['message'])),
+        );
+      }
     }
   }
 

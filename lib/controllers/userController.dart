@@ -193,5 +193,195 @@ class UserController {
     }
   }
 
-  // Placeholder for other user-related methods if needed
+  // Change Password
+  Future<Map<String, dynamic>> changePassword({
+    required String oldPassword,
+    required String newPassword,
+    required String confirmNewPassword,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    if (token == null) {
+      return {
+        'success': false,
+        'message': 'Token not found. User not logged in.'
+      };
+    }
+
+    final url = Uri.parse('$_baseUrl/change-password');
+    try {
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'oldPassword': oldPassword,
+          'newPassword': newPassword,
+          'confirmNewPassword': confirmNewPassword,
+        }),
+      );
+
+      final responseData = jsonDecode(response.body);
+      if (response.statusCode == 200 && responseData['success'] == true) {
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Password changed successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseData['message'] ?? 'Failed to change password'
+        };
+      }
+    } catch (error) {
+      print('Change password error: $error');
+      return {
+        'success': false,
+        'message': 'An error occurred while changing password.'
+      };
+    }
+  }
+
+  // Update User Profile
+  Future<Map<String, dynamic>> updateProfile({
+    required String name,
+    required String emergencyPhone,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    if (token == null) {
+      return {
+        'success': false,
+        'message': 'Token not found. User not logged in.'
+      };
+    }
+
+    final url = Uri.parse('$_baseUrl/profile');
+    try {
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'name': name,
+          'emergencyPhone': emergencyPhone,
+        }),
+      );
+
+      final responseData = jsonDecode(response.body);
+      if (response.statusCode == 200 && responseData['success'] == true) {
+        // Update the stored user data
+        final userData = responseData['data'];
+        await prefs.setString('userData', jsonEncode(userData));
+
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Profile updated successfully',
+          'data': userData
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseData['message'] ?? 'Failed to update profile'
+        };
+      }
+    } catch (error) {
+      print('Update profile error: $error');
+      return {
+        'success': false,
+        'message': 'An error occurred while updating profile.'
+      };
+    }
+  }
+
+  // Logout User
+  Future<Map<String, dynamic>> logout() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    try {
+      // Clear token and user data from SharedPreferences
+      await prefs.remove('token');
+      await prefs.remove('userData');
+      await prefs.setBool('isLoggedIn', false);
+
+      // You could also call a logout endpoint on the server if needed
+      // final url = Uri.parse('$_baseUrl/logout');
+      // final token = prefs.getString('token');
+      // if (token != null) {
+      //   await http.post(
+      //     url,
+      //     headers: {
+      //       'Content-Type': 'application/json',
+      //       'Authorization': 'Bearer $token',
+      //     },
+      //   );
+      // }
+
+      return {'success': true, 'message': 'Logged out successfully'};
+    } catch (error) {
+      print('Logout error: $error');
+      return {'success': false, 'message': 'An error occurred during logout.'};
+    }
+  }
+
+  // Get User Profile
+  Future<Map<String, dynamic>> getUserProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    if (token == null) {
+      return {
+        'success': false,
+        'message': 'Token not found. User not logged in.'
+      };
+    }
+
+    final url = Uri.parse('$_baseUrl/profile');
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final responseData = jsonDecode(response.body);
+      if (response.statusCode == 200 && responseData['success'] == true) {
+        final userDataFromServer = responseData['data'];
+        // The backend sends '_id', our model expects 'id'.
+        // The backend also sends 'id' directly now based on the provided backend code.
+        // Let's ensure we handle both cases or prioritize 'id' if present.
+        final Map<String, dynamic> userJson = {
+          'id': userDataFromServer['id'] ??
+              userDataFromServer['_id'] ??
+              '', // Handle both _id and id
+          'name': userDataFromServer['name'] ?? '',
+          'email': userDataFromServer['email'] ?? '',
+          'emergencyPhone': userDataFromServer['emergencyPhone'] ?? '',
+          'profileImage': userDataFromServer['profileImage'],
+          // 'password' is not sent by this endpoint, User.fromJson will use default ''
+        };
+        final user = users.fromJson(userJson);
+        return {'success': true, 'user': user};
+      } else {
+        return {
+          'success': false,
+          'message': responseData['message'] ?? 'Failed to fetch user profile'
+        };
+      }
+    } catch (error) {
+      print('Get user profile error: $error');
+      return {
+        'success': false,
+        'message': 'An error occurred while fetching user profile.'
+      };
+    }
+  }
 }

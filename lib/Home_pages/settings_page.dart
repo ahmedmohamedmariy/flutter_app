@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:precure/api_config.dart';
 import 'package:precure/theme/theme_provider.dart';
+import 'package:precure/controllers/userController.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -17,8 +18,10 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  final UserController _userController = UserController();
   bool isDarkMode = false;
   String selectedLanguage = 'English';
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -45,31 +48,74 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _logout() {
+    // Create a StatefulBuilder to manage the loading state within the dialog
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Confirm Logout"),
-          content: const Text("Are you sure you want to log out?"),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text("Cancel"),
-            ),
-            TextButton(
-              onPressed: () async {
-                SharedPreferences prefs = await SharedPreferences.getInstance();
-                await prefs.setBool('isLoggedIn', false); // Set login status to false
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                  (Route<dynamic> route) => false,
-                );
-              },
-              child: const Text("Logout"),
-            ),
-          ],
+      barrierDismissible: false, // Prevent dismissing by tapping outside
+      builder: (BuildContext dialogContext) {
+        bool isLoggingOut = false;
+        
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text("Confirm Logout"),
+              content: isLoggingOut 
+                ? const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text("Logging out..."),
+                    ],
+                  )
+                : const Text("Are you sure you want to log out?"),
+              actions: isLoggingOut 
+                ? [] 
+                : [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                      },
+                      child: const Text("Cancel"),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        // Set loading state in the dialog
+                        setDialogState(() {
+                          isLoggingOut = true;
+                        });
+                        
+                        try {
+                          // Call the logout method from UserController
+                          final response = await _userController.logout();
+                          
+                          if (response['success'] == true) {
+                            // Navigate to login page
+                            Navigator.of(dialogContext).pop(); // Close the dialog first
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(builder: (context) => const LoginPage()),
+                              (Route<dynamic> route) => false,
+                            );
+                          } else {
+                            // Show error message
+                            Navigator.of(dialogContext).pop(); // Close the dialog
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(response['message'] ?? 'Failed to logout')),
+                            );
+                          }
+                        } catch (e) {
+                          // Show error message
+                          Navigator.of(dialogContext).pop(); // Close the dialog
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('An error occurred during logout: ${e.toString()}')),
+                          );
+                        }
+                      },
+                      child: const Text("Logout"),
+                    ),
+                  ],
+            );
+          }
         );
       },
     );
